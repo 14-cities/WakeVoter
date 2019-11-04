@@ -136,17 +136,30 @@ def get_county_voter_MECE_data(state_history_file, county_name):
     Returns:
         dataframe of voters, indexed by `ncid`
     '''
-    #Read the data into a dataframe
+
+    #Read the data into an iterator, 500,000 rows at a time
     if state_history_file[-4:] == '.txt':
         print(" Reading in state voter history data")
-        dfStateHistory = pd.read_csv(state_history_file,sep='\t',usecols=('county_desc','election_lbl','ncid'))
-        #Subset records for the county
+        dataIterator = pd.read_csv(
+            state_history_file,
+            dtype=np.object,
+            chunksize=500000,
+            sep='\t',
+            usecols=('county_desc','election_lbl','ncid'),
+            low_memory=True,
+        )
+
+        #Subset records for the county, adding each chunk to dfCountyHistory frame after it is filtered
         print(" Subseting county records")
-        dfCountyHistory = dfStateHistory[dfStateHistory['county_desc']==county_name]
+        dfCountyHistory = pd.DataFrame()
+        for chunk in dataIterator:
+            chunk = chunk[chunk['county_desc'] == county_name]
+            dfCountyHistory = pd.concat([dfCountyHistory,chunk])
     else:
         print(" Reading in county records")
         dfCountyHistory = pd.read_csv(state_history_file,usecols=('county_desc','election_lbl','ncid'))
-    
+
+
     #Subset records for the elections of interest
     print(" Subsetting election data")
     elections = ('10/10/2017','11/07/2017','11/06/2018','11/08/2016','11/06/2012')
