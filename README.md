@@ -15,9 +15,11 @@ Analysis of NC census and elections data to identify areas of low minority voter
 * Install requirements with `$ pip install -r reqs.txt` (**NOTE:** it is heavily encouraged to do this in a virtual environment)
 * Request an (API key)[https://api.census.gov/data/key_signup.html] from  the US Census
 * When the key arrives in an email, copy and paste it into a file called `APIkey.txt` at the root of WakeVoter
-* To run the applicaiton, start a new Python shell session and import the `VoteSqaud.py` file
-  * `$ python`
-  * `>>> import VoteSquad.py`
+* To run the applicaiton, call it from the command line: 
+
+```bash
+$ python VoteSquad.py --state-fips=37 --county-fips=183 --county-name=WAKE
+```
 
 
 #### OS Specific troubleshooting
