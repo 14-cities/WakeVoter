@@ -653,8 +653,31 @@ def tally_block_MECE_scores(gdf_voter):
     return df_MECE
 
 
+def get_counties_from_fips(fips):
+    '''Given a FIPS code, return the matching county (or counties)
+
+    To get a single county, pass in the full 5 digit fips code for that county. To get a list of all counties in a state
+    pass in the 2 digit FIPS code for that state
+
+    Args:
+        fips: a FIPS number in the form of a 2 or 5 digit string
+
+    Yields:
+        list of named tuples with the 2 letter state name abbreviation, fips code, and county name
+    '''
+    fips = str(fips)
+    assert fips.isnumeric(), "FIPS codes must be numeric"
+    assert len(fips) == 2 or len(fips) == 5, "FIPS codes must be either 2 or 5 characters long"
+
+    with open(os.path.join('data', 'fips_codes.csv')) as fips_codes_csv:
+        df = pd.read_csv(fips_codes_csv,sep='\t',usecols=('fips_code','county_name','state'),dtype=str)
+    df = df[df.fips_code.str.startswith(fips)]
+
+    yield from df.reset_index().itertuples(name='County')
+
+
 def run(state_fips, county_fips, county_name):
-    '''Run all the above functions, altimately saving a shape file of census blocks
+    '''Run all the above functions, ultimately saving a shape file of census blocks
 
     This file will contain Census blocks that are majority black and have at least 50 black
     households (BHH). Adjacent census blocks with fewer than 50 BHH will be aggregated
@@ -663,7 +686,7 @@ def run(state_fips, county_fips, county_name):
     Args:
         state_fips: string of the state FIPS number
         state_fips: string of the county FIPS number
-        state_fips: upercase string of the county name
+        state_fips: uppercase string of the county name
 
     '''
 
@@ -1057,9 +1080,12 @@ def run(state_fips, county_fips, county_name):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("WakeVoter")
-    parser.add_argument("--state-fips", type=str, help="Numeric FIPS code for the state", required=True)
-    parser.add_argument("--county-fips", type=str, help="Numeric FIPS code for the county", required=True)
-    parser.add_argument("--county-name", type=str.upper, help="Name of the county", required=True)
+    parser.add_argument("--fip", type=str, help="Numeric FIPS code for the state or county", required=True)
     args = parser.parse_args()
 
-    run(args.state_fips, args.county_fips, args.county_name)
+    for county in get_counties_from_fips(args.fip):
+        run(
+            state_fips=county.fips_code[:2],
+            county_fips=county.fips_code[2:],
+            county_name=county.county_name.upper()
+        )
