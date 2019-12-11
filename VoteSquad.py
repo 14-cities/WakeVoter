@@ -833,7 +833,11 @@ def run(with_voter_data, state, state_fips, county_fips, county_name):
 
     #Step 4a. Cluster adjacent blocks into a single feature and assing a ClusterID
     print("  4a. Finding intitial clusters...")
-    gdfClusters = gpd.GeoDataFrame(geometry = list(gdfMajBlack_LT50.unary_union))
+
+    if len(gdfMajBlack_LT50) > 1:
+        gdfClusters = gpd.GeoDataFrame(geometry = list(gdfMajBlack_LT50.unary_union))
+    else:
+        gdfClusters = gpd.GeoDataFrame(gdfMajBlack_LT50["geometry"]).reset_index()
     gdfClusters['ClusterID'] = gdfClusters.index
     gdfClusters.crs = gdfMajBlack_LT50.crs #Set the coordinate reference system
 
@@ -920,28 +924,37 @@ def run(with_voter_data, state, state_fips, county_fips, county_name):
 
             #Add the dataframe to the list of datarames
             gdfs.append(gdfSelect[gdfSelect['BlackHH'] >= 50])    
-            
+
             #Stop the loop if run for over 100 iterations
             stopLoop += 1
             if stopLoop > 100: break
-        
+
+    gdfOrgsForMerge = [gdf_Org1, gdf_Org2]
+
     #-> Concat these to a new geodataframe, update pct fields, and add Org ID and types
-    print("    ...completing creating on new clusters: 'Org3'")
-    gdf_Org3 = pd.concat(gdfs,sort=False)
-    gdf_Org3['PctBlack'] = gdf_Org3['P003003'] / gdf_Org3['P003001'] * 100
-    gdf_Org3['PctBlack18'] = gdf_Org3['P010004'] / gdf_Org3['P010001'] * 100
-    gdf_Org3['OrgID'] = gdf_Org2['OrgID'].max() + gdf_Org3.index + 1
-    gdf_Org3['OrgType'] = 'block aggregate'
-    gdf_Org3.drop(['claimed'],axis=1,inplace=True)
+    if gdfs:
+        print("    ...completing creating on new clusters: 'Org3'")
+        gdf_Org3 = pd.concat(gdfs,sort=False)
+        gdf_Org3['PctBlack'] = gdf_Org3['P003003'] / gdf_Org3['P003001'] * 100
+        gdf_Org3['PctBlack18'] = gdf_Org3['P010004'] / gdf_Org3['P010001'] * 100
+        gdf_Org3['OrgID'] = gdf_Org2['OrgID'].max() + gdf_Org3.index + 1
+        gdf_Org3['OrgType'] = 'block aggregate'
+        gdf_Org3.drop(['claimed'],axis=1,inplace=True)
+        gdfOrgsForMerge.append(gdf_Org3)
 
     #--- Step 5. Merge all three keepers
     print(" 5. Combining Org1, Org2, Org3 into a single feature class")
-    gdfAllOrgs = pd.concat((gdf_Org1, gdf_Org2, gdf_Org3),axis=0,sort=True)
+    gdfAllOrgs = pd.concat(gdfOrgsForMerge,axis=0,sort=True)
 
     #--- Step 6. Assign random IDs 
     print(" 6. Assigning random IDs for org units")
     # 1. Compute Random Org IDs
     numRows = gdfAllOrgs.shape[0]
+
+    # Not enough BHH
+    if not numRows:
+        return
+
     gdfAllOrgs['Rando'] = np.random.randint(numRows,size=(numRows,1)) 
     gdfAllOrgs.sort_values(by='Rando',axis=0,inplace=True)
     gdfAllOrgs.reset_index(inplace=True)
@@ -973,7 +986,7 @@ def run(with_voter_data, state, state_fips, county_fips, county_name):
         gdfVoter_org.drop(columns=['index_left','Oct17', 'Nov12', 'Nov18', 'Nov17', 'Nov16',
                                    'HOUSING10', 'POP10', 'P003001', 'P003003', 'P010001',
                                    'P010004', 'PctBlack', 'PctBlack18', 'BlackHH'],inplace=True)
-           
+
         #--- Step 9. Add precinct and city information to org unit
         print(" 9. Adding precinct and city information to org units")
         # -> Create a lookup table of precincty and city for each random ID
@@ -987,8 +1000,6 @@ def run(with_voter_data, state, state_fips, county_fips, county_name):
         # -> fix column types
         gdfAllOrgs['precinct_abbrv'] = gdfAllOrgs['precinct_abbrv'].astype('str')
         gdfAllOrgs['res_city_desc'] = gdfAllOrgs['res_city_desc'].astype('str')
-
-
 
     #--- Step 10. Tidy up and export the org unit feature class
     print(' 10. Tiding and exporting org unit features...')
