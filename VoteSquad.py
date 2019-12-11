@@ -1131,38 +1131,38 @@ if __name__ == '__main__':
         action='store_true',
         help="Include voter history data, currently only works in NC")
 
-
     args = parser.parse_args()
 
     caught_exceptions = []
 
-    for county in get_counties_from_fips(args.fip):
-        if args.voter_data and county.state != 'NC':
-            print(" ** WARNING: Voter file information currently only works with NC **")
+    for fip in args.fip.split(","):
+        for county in get_counties_from_fips(fip):
+            if args.voter_data and county.state != 'NC':
+                print(" ** WARNING: Voter file information currently only works with NC **")
 
-        try:
-            run(
-                with_voter_data=args.voter_data,
-                state=county.state,
-                state_fips=county.fips_code[:2],
-                county_fips=county.fips_code[2:],
-                county_name=county.county_name.upper()
-            )
+            try:
+                run(
+                    with_voter_data=args.voter_data,
+                    state=county.state,
+                    state_fips=county.fips_code[:2],
+                    county_fips=county.fips_code[2:],
+                    county_name=county.county_name.upper()
+                )
 
-        except Exception as e:
-            if args.suppress_errors:
-                print("  * Exception caught, continuing with next county *")
-                print(traceback.format_exc())
-                caught_exceptions.append((county.county_name, e))
-            else:
-                raise e\
+            except Exception as e:
+                if args.suppress_errors:
+                    print("  * Exception caught, continuing with next county *")
+                    print(traceback.format_exc())
+                    caught_exceptions.append((county, e))
+                else:
+                    raise e
 
-    if caught_exceptions:
-        print("**************************************************")
-        print(f"    {len(caught_exceptions)} exception caught while running")
-        print("**************************************************")
+        if caught_exceptions:
+            print("**************************************************")
+            print(f"    {len(caught_exceptions)} exception caught while running")
+            print("**************************************************")
 
-        for county_name, exception in caught_exceptions:
-            print(f" # Exception caught while processing {county_name}")
-            print(exception)
-            print("")
+            for county, exception in caught_exceptions:
+                print(f" # Exception caught while processing {county.county_name} ({county.fips_code})")
+                print(exception)
+                print("")
